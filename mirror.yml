@@ -1,0 +1,85 @@
+name: elvish
+target:
+  registry: ocx.sh
+  repository: elvish
+
+# Elvish ships NO binary assets on its GitHub releases. Binaries live on the
+# dl.elv.sh CDN. generate.py enumerates versions from elves/elvish GitHub
+# releases and synthesizes the canonical dl.elv.sh download URLs into a
+# url_index document, emitting platform-tagged asset names to avoid key
+# collisions (the real CDN filenames are identical across platforms).
+source:
+  type: url_index
+  generator:
+    command: ["uv", "run", "generate.py"]
+    timeout_seconds: 240
+
+# Asset names are synthesized by generate.py as `elvish-v{V}-{OS}-{ARCH}.{EXT}`.
+# Anchored ^…$ prevents any accidental sidecar matches.
+# Each pattern resolves exactly one asset per in-range version (verified for
+# newest v0.21.0 and oldest v0.21.0 — the only released version at floor).
+assets:
+  linux/amd64:
+    - "^elvish-v.*-linux-amd64\\.tar\\.gz$"
+  linux/arm64:
+    - "^elvish-v.*-linux-arm64\\.tar\\.gz$"
+  darwin/amd64:
+    - "^elvish-v.*-darwin-amd64\\.tar\\.gz$"
+  darwin/arm64:
+    - "^elvish-v.*-darwin-arm64\\.tar\\.gz$"
+  windows/amd64:
+    - "^elvish-v.*-windows-amd64\\.zip$"
+
+# Each archive (tar.gz and zip) is built from the binary's parent directory
+# with `tmp pwd = $bin-dir` (see tools/buildall.elv), so the binary lands at
+# the archive root with no wrapper directory. strip_components: 0 is correct.
+# Binary names: `elvish` (unix) / `elvish.exe` (windows).
+asset_type:
+  type: archive
+  strip_components: 0
+
+metadata:
+  default: metadata.json
+
+skip_prereleases: true
+cascade: true
+build_timestamp: none
+
+versions:
+  # Floor = 0.21.0: the first release whose dl.elv.sh CDN layout is verified.
+  # windows/arm64 does NOT exist upstream; omitted entirely.
+  min: "0.21.0"
+  new_per_run: 5
+  poll_interval: "0 */6 * * *"
+
+concurrency:
+  max_downloads: 8
+  max_bundles: 4
+  max_pushes: 2
+  rate_limit_ms: 100
+  max_retries: 3
+  compression_threads: 0
+
+tests:
+  - name: smoke
+    script: tests/smoke.star
+
+platforms:
+  linux/amd64:
+    runner: ubuntu-latest
+  linux/arm64:
+    runner: ubuntu-24.04-arm
+  # Both darwin arches run on the arm64 macos-14 runner; the Intel slice is
+  # exec'd by the arm64 ocx and translated by Rosetta 2 (no arch prefix).
+  darwin/amd64:
+    runner: macos-14
+  darwin/arm64:
+    runner: macos-14
+    shell: bash
+  windows/amd64:
+    runner: windows-latest
+    shell: pwsh
+
+notify:
+  discord:
+    webhook_secret: OCX_MIRROR_DISCORD_HOOK

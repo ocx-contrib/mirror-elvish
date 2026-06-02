@@ -1,0 +1,4 @@
+/.ocx/
+/.direnv/
+*.tmp
+.DS_Store
