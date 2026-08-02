@@ -1,0 +1,113 @@
+extends: ../mirror-base.yml
+
+name: elvish
+
+# Logical index package `elvish/elvish` at the physical path
+# `ghcr.io/ocx-contrib/elvish/elvish` — slash segments, never hyphen-flattened.
+# The first segment must be this repo's own GitHub owner: GITHUB_TOKEN only
+# authorises packages owned by the repo the workflow runs in.
+#
+# Tool-as-namespace: upstream's GitHub org is `elves`, which means nothing to
+# anyone who does not already know the shell, so the tool names itself.
+#
+# Succeeds the flat `ocx.sh/elvish` coordinate this repository published before
+# the grouped layout.
+target:
+  registry: ghcr.io
+  repository: ocx-contrib/elvish/elvish
+
+# Elvish ships NO binary assets on its GitHub releases. Binaries live on the
+# dl.elv.sh CDN. scripts/generate.py enumerates versions from elves/elvish
+# GitHub releases and synthesizes the canonical dl.elv.sh download URLs into a
+# url_index document, emitting platform-tagged asset names to avoid key
+# collisions (the real CDN filenames are identical across platforms).
+#
+# `command` resolves against THIS spec's directory, so the path is
+# `scripts/generate.py` and not `elvish/scripts/generate.py`.
+source:
+  type: url_index
+  generator:
+    command: ["uv", "run", "scripts/generate.py"]
+    timeout_seconds: 240
+
+# ─── libc gate (Phase 3.5) — the evidence, not the conclusion ───────────────
+#
+# Elvish is a pure-Go build, so dl.elv.sh ships ONE tarball per Linux arch and
+# it is fully static. Measured 2026-08-01 on v0.21.0:
+#
+#   linux-amd64/elvish-v0.21.0.tar.gz → elvish
+#     ELF 64-bit LSB executable, x86-64, statically linked, Go BuildID=…
+#     no INTERP segment | no NEEDED entries
+#   linux-arm64/elvish-v0.21.0.tar.gz → elvish
+#     ELF 64-bit LSB executable, ARM aarch64, statically linked, Go BuildID=…
+#     no INTERP segment | no NEEDED entries
+#
+# No PT_INTERP and no DT_NEEDED means the artifact requires nothing of the
+# host, so both Linux keys are BARE — no `+libc.*` suffix. There is no
+# musl/alpine counterpart on the CDN to split against. The container legs
+# (ubuntu + alpine + fedora) live in ../mirror-base.yml and are what turn that
+# claim into evidence.
+#
+# ─── Asset names are synthesized ────────────────────────────────────────────
+#
+# The real CDN filename is `elvish-v{V}.tar.gz` on EVERY platform — only the
+# URL path segment distinguishes them — so scripts/generate.py emits
+# `elvish-v{V}-{os}-{arch}.{ext}` as the asset key. Anchored ^…$ prevents any
+# accidental sidecar match. Each pattern resolves EXACTLY one asset per
+# in-range version — verified across the whole in-range set (v0.21.0 only, at
+# the floor) by running the generator. A pattern matching zero is silently
+# skipped, not an error: it would yield a green run with a missing platform.
+assets:
+  linux/amd64:
+    - "^elvish-v.*-linux-amd64\\.tar\\.gz$"
+  linux/arm64:
+    - "^elvish-v.*-linux-arm64\\.tar\\.gz$"
+  darwin/amd64:
+    - "^elvish-v.*-darwin-amd64\\.tar\\.gz$"
+  darwin/arm64:
+    - "^elvish-v.*-darwin-arm64\\.tar\\.gz$"
+  windows/amd64:
+    - "^elvish-v.*-windows-amd64\\.zip$"
+
+# Each archive (tar.gz and zip) is built from the binary's parent directory
+# with `tmp pwd = $bin-dir` (see upstream tools/buildall.elv), so the binary
+# lands at the archive root with no wrapper directory. strip_components: 0 is
+# correct. Binary names: `elvish` (unix) / `elvish.exe` (windows).
+asset_type:
+  type: archive
+  strip_components: 0
+
+metadata:
+  default: metadata.json
+
+catalog:
+  # Resolves against this spec's own directory, and keeping the logo here puts
+  # it inside this workflow's `elvish/**` path trigger — a repo-root logo.*
+  # sits in no path filter and replacing it would publish nothing.
+  # CATALOG.md is found by the default probe beside this file.
+  logo: logo.svg
+
+versions:
+  # Floor = 0.21.0: the first release whose dl.elv.sh CDN layout is verified.
+  # windows/arm64 does NOT exist upstream; omitted entirely.
+  min: "0.21.0"
+  new_per_run: 5
+  poll_interval: "0 */6 * * *"
+
+tests:
+  # `script:` resolves from the REPOSITORY ROOT — unlike `metadata.default` and
+  # `catalog.logo` above, which resolve against this spec's own directory.
+  - name: smoke
+    script: elvish/tests/smoke.star
+
+annotations:
+  # From the Phase 1.5 license gate:
+  #   $ gh api repos/elves/elvish/license --jq '.license.spdx_id'
+  #   BSD-2-Clause
+  org.opencontainers.image.licenses: "BSD-2-Clause"
+
+announce:
+  # Spelled out, not derived from target.repository — the logical name and the
+  # physical path are related by convention only.
+  package: elvish/elvish
+  fork: ocx-contrib/index

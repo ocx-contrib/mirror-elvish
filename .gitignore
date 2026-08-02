@@ -1,4 +1,19 @@
+# Toolchain
 /.ocx/
 /.direnv/
+
+# Local prepare scratch
+.ocx-mirror/
+prepare-output/
+
+# Local artifacts
+*.tar.xz
+*.tar.gz
+run-summary.json
+junit/
 *.tmp
+
+# Editor
+.vscode/
+.idea/
 .DS_Store

@@ -1,13 +1,15 @@
 #:schema https://ocx.sh/schemas/project/v1.json
 # OCX project toolchain for the mirror-elvish sibling repo.
 #
-# `cli` + `mirror` are the OCX pipeline tools (same pins as the other
-# mirror-* siblings). `uv` is added so `ocx-mirror pipeline plan` finds
-# `uv` on PATH when invoking the PEP 723 generate.py script — Elvish ships
-# its binaries on the dl.elv.sh CDN, not as GitHub release assets, so
-# this is a url_index mirror with a generator.
+# `uv` is the generator runtime: Elvish ships its binaries on the dl.elv.sh
+# CDN rather than as GitHub release assets, so this is a `url_index` mirror
+# whose `generator.command` is `["uv", "run", "scripts/generate.py"]`. Without
+# `uv` on PATH, discover dies before it reads a single release.
+#
+# The namespaced `ocx.sh/astral-sh/uv` (published by ocx-contrib/mirror-astral-sh)
+# — never the flat `ocx.sh/uv`, which dies with the ocx.sh host.
 
 [tools]
-cli = "dev.ocx.sh/ocx/cli:0.4.0-dev"
-mirror = "dev.ocx.sh/ocx/mirror:0.5.0-dev"
-uv = "ocx.sh/uv:0"
+cli = "ocx.sh/ocx/cli:0.5"
+mirror = "ocx.sh/ocx/mirror:0.5"
+uv = "ocx.sh/astral-sh/uv:0"
