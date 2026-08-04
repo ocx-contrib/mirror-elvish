@@ -92,7 +92,7 @@ versions:
   # windows/arm64 does NOT exist upstream; omitted entirely.
   min: "0.21.0"
   new_per_run: 5
-  poll_interval: "0 */6 * * *"
+  poll_interval: "42 1-23/6 * * *"
 
 tests:
   # `script:` resolves from the REPOSITORY ROOT — unlike `metadata.default` and
